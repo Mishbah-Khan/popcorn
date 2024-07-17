@@ -13,6 +13,7 @@ function StarRating({
   size = 25,
   color = "#fcc419",
   className = "",
+  onSetRating,
 }) {
   const [rating, setReting] = useState(0);
   const [tempRating, setTempReting] = useState(0);
@@ -25,6 +26,7 @@ function StarRating({
 
   function handelRating(rating) {
     setReting(rating);
+    onSetRating(rating);
   }
   return (
     <div style={containerStyle} className={className}>

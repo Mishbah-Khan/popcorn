@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import StarRating from "./StarRating";
 
 const average = (arr) =>
   arr.reduce((acc, cur, i, arr) => acc + cur / arr.length, 0);
@@ -20,7 +21,12 @@ function App() {
   function goBack() {
     setSelectedId(null);
   }
-
+  function handleMovieWatched(movie) {
+    setWatched((watched) => [...watched, movie]);
+  }
+  function watchedDeleteHandler(id) {
+    setWatched(watched.filter((movie) => movie.imdbID !== id));
+  }
   useEffect(
     function () {
       async function fetchMovie() {
@@ -71,13 +77,19 @@ function App() {
         </Box>
         <Box>
           {selectedId ? (
-            <MovieDetails goBack={goBack} selectedId={selectedId} />
+            <MovieDetails
+              goBack={goBack}
+              selectedId={selectedId}
+              onAddToWatch={handleMovieWatched}
+              watched={watched}
+            />
           ) : (
             <>
               <WatchedSummary watched={watched} />
               <WatchedMovieList
                 watched={watched}
                 selectHandler={selectHandler}
+                watchedDeleteHandler={watchedDeleteHandler}
               />
             </>
           )}
@@ -201,36 +213,158 @@ function WatchedSummary({ watched }) {
         </p>
         <p>
           <span>⭐️</span>
-          <span>{avgImdbRating}</span>
+          <span>{avgImdbRating.toFixed(1)}</span>
         </p>
         <p>
           <span>🌟</span>
-          <span>{avgUserRating}</span>
+          <span>{avgUserRating.toFixed(1)}</span>
         </p>
         <p>
           <span>⏳</span>
-          <span>{avgRuntime} min</span>
+          <span>{avgRuntime.toFixed(0)} min</span>
         </p>
       </div>
     </div>
   );
 }
 
-function WatchedMovieList({ watched }) {
+function WatchedMovieList({ watched, watchedDeleteHandler }) {
   return (
     <ul className="list">
       {watched.map((movie) => (
-        <WatchedMovie movie={movie} key={movie.imdbID} />
+        <>
+          <WatchedMovie
+            movie={movie}
+            key={movie.imdbID}
+            watchedDeleteHandler={watchedDeleteHandler}
+          />
+        </>
       ))}
     </ul>
   );
 }
 
-function WatchedMovie({ movie }) {
+function MovieDetails({ selectedId, goBack, onAddToWatch, watched }) {
+  const [movieDetail, setMovieDetail] = useState({});
+  const [isLoading, setIsLoding] = useState(false);
+  const [userRating, setUserRating] = useState("");
+
+  const isWatched = watched.map((mv) => mv.imdbID).includes(selectedId);
+
+  const watchedUserRating = watched.find(
+    (movie) => movie.imdbID === selectedId
+  )?.userRating;
+
+  const {
+    imdbID,
+    Title: title,
+    Poster: poster,
+    Year: year,
+    imdbRating,
+    Runtime: runtime,
+    Country: country,
+    Language: language,
+    Plot: plot,
+    Actors: actors,
+    Director: director,
+    Writer: writer,
+  } = movieDetail;
+
+  function onAddHandler() {
+    const newWatched = {
+      imdbID: selectedId,
+      title,
+      poster,
+      year,
+      imdbRating: Number(imdbRating),
+      runtime: Number(runtime.split(" ").at(0)),
+      userRating,
+    };
+
+    onAddToWatch(newWatched);
+    goBack();
+  }
+
+  useEffect(
+    function () {
+      async function getMovieDetails() {
+        setIsLoding(true);
+        const res = await fetch(
+          `https://www.omdbapi.com/?apikey=${key}&i=${selectedId}`
+        );
+
+        const data = await res.json();
+        setMovieDetail(data);
+        setIsLoding(false);
+      }
+      getMovieDetails();
+    },
+    [selectedId]
+  );
+
+  return (
+    <div className="details">
+      {isLoading ? (
+        <Loader />
+      ) : (
+        <>
+          <header className="details header">
+            <button className="btn-back" onClick={goBack}>
+              &larr;
+            </button>
+            <img src={movieDetail.Poster} alt={movieDetail.Title} />
+            <div className="details-overview">
+              <h2>{movieDetail.Title}</h2>
+              <p>
+                {movieDetail.Released} &bull; {movieDetail.Runtime}
+              </p>
+              <p>{movieDetail.Genre}</p>
+              <p>
+                <span>⭐</span>
+                {movieDetail.imdbRating} IMD Rating
+              </p>
+            </div>
+          </header>
+          <section>
+            <div className="rating">
+              {!isWatched ? (
+                <>
+                  <StarRating
+                    maxLength={10}
+                    size={20}
+                    onSetRating={setUserRating}
+                  />
+                  {userRating > 0 && (
+                    <button onClick={onAddHandler} className="btn-add">
+                      +Add to list
+                    </button>
+                  )}
+                </>
+              ) : (
+                <p>
+                  You rated this movie {watchedUserRating}
+                  <span> ⭐</span>{" "}
+                </p>
+              )}
+            </div>
+            <p>Country : {country}</p>
+            <p>Language : {language}</p>
+            <p>{plot}</p>
+            <p>Starring : {actors}</p>
+            <p>Director : {director}</p>
+            <p>Written By : {writer}</p>
+          </section>
+        </>
+      )}
+    </div>
+  );
+}
+
+function WatchedMovie({ movie, watchedDeleteHandler }) {
   return (
     <li>
-      <img src={movie.Poster} alt={`${movie.Title} poster`} />
-      <h3>{movie.Title}</h3>
+      <img src={movie.poster} alt={`${movie.title} poster`} />
+      <h3>{movie.title}</h3>
       <div>
         <p>
           <span>⭐️</span>
@@ -244,20 +378,14 @@ function WatchedMovie({ movie }) {
           <span>⏳</span>
           <span>{movie.runtime} min</span>
         </p>
+        <button
+          className="btn-delete"
+          onClick={() => watchedDeleteHandler(movie.imdbID)}
+        >
+          X
+        </button>
       </div>
     </li>
   );
 }
-
-function MovieDetails({ selectedId, goBack }) {
-  return (
-    <div className="details">
-      <button className="btn-back" onClick={goBack}>
-        &larr;
-      </button>
-      <h1>{selectedId}</h1>
-    </div>
-  );
-}
-
 export default App;
